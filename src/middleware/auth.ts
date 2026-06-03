@@ -16,3 +16,4 @@ export const authMiddleware = (req: Request, _res: Response, next: NextFunction)
     next(new AppError(401, "Invalid or expired token", "TOKEN_EXPIRED"));
   }
 };
+
