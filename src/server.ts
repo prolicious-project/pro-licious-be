@@ -1,40 +1,37 @@
-import express from "express";
-import cors from "cors";
+import http from "http";
+import { Server } from "socket.io";
 import { env } from "./config/env";
 import { pool } from "./config/database";
 import redisClient from "./config/redis";
+import app from "./app";
+import { registerSocketHandlers } from "./socket/handlers";
 
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-
-app.get("/health", (_req, res) => {
-  res.json({
-    success: true,
-    message: "Prolious Backend Running",
-  });
+/** Create HTTP server and attach Socket.IO for live tracking */
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: env.FRONTEND_URL, credentials: true },
 });
+
+registerSocketHandlers(io);
 
 const startServer = async () => {
   try {
     await pool.query("SELECT NOW()");
-
     console.log("✅ PostgreSQL Connected");
 
-    await redisClient.connect();
-
+    if (!redisClient.isOpen) await redisClient.connect();
     console.log("✅ Redis Connected");
 
-    app.listen(env.PORT, () => {
-      console.log(
-        `🚀 Server running on port ${env.PORT}`
-      );
+    httpServer.listen(env.PORT, () => {
+      console.log(`🚀 Server + Socket.IO running on port ${env.PORT}`);
+      console.log(`📚 API Docs: http://localhost:${env.PORT}/api/docs`);
     });
   } catch (error) {
-    console.error(error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 };
 
 startServer();
+
+export { io };
