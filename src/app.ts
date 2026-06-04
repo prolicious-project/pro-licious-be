@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import { swaggerUi, swaggerSpec } from "./docs/swagger";
+import { swaggerUi, swaggerSpec, swaggerUiOptions } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth.routes";
 import customerRoutes from "./routes/customer.routes";
@@ -25,7 +25,7 @@ app.get("/health", (_req, res) => {
 });
 
 /** Swagger API docs */
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 
 /** REST API routes — 87 endpoints total */
 app.use("/api/auth", authRoutes);

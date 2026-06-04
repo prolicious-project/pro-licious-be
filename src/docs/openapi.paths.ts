@@ -1,13 +1,174 @@
+// --- Define Custom Response Schemas for Swagger UI ---
+
+const rObj = (dataProps: Record<string, unknown>, messageExample = "Success") => ({
+  type: "object",
+  properties: {
+    success: { type: "boolean", example: true },
+    message: { type: "string", example: messageExample },
+    data: { type: "object", properties: dataProps }
+  }
+});
+
+const rArr = (itemProps: Record<string, unknown>, messageExample = "Success") => ({
+  type: "object",
+  properties: {
+    success: { type: "boolean", example: true },
+    message: { type: "string", example: messageExample },
+    data: {
+      type: "array",
+      items: { type: "object", properties: itemProps }
+    }
+  }
+});
+
+const sendOtpRes = rObj({
+  message: { type: "string", example: "OTP sent to phone" },
+  phone: { type: "string", example: "9876543210" },
+  expiresIn: { type: "string", example: "10 minutes" }
+}, "OTP sent successfully");
+
+const verifyOtpRes = rObj({
+  userId: { type: "integer", example: 1 },
+  accessToken: { type: "string", example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+  refreshToken: { type: "string", example: "7c13a005-728b-4a5d-b0db-6e6917f8a7e0" },
+  role: { type: "string", example: "CUSTOMER" },
+  expiresIn: { type: "string", example: "4 hours" }
+}, "Authenticated");
+
+const meRes = rObj({
+  id: { type: "integer", example: 1 },
+  name: { type: "string", example: "Alex Mercer" },
+  phone: { type: "string", example: "9876543210" },
+  role: { type: "string", example: "CUSTOMER" },
+  status: { type: "string", example: "ACTIVE" }
+});
+
+const profileRes = rObj({
+  id: { type: "integer", example: 1 },
+  name: { type: "string", example: "Alex Mercer" },
+  phone: { type: "string", example: "9876543210" },
+  email: { type: "string", example: "alex@prolicious.com" },
+  gender: { type: "string", example: "MALE" },
+  profileImage: { type: "string", example: "https://cdn.com/profile.jpg" }
+});
+
+const addressRes = rArr({
+  id: { type: "integer", example: 5 },
+  addressType: { type: "string", example: "HOME" },
+  houseNumber: { type: "string", example: "Flat 402" },
+  street: { type: "string", example: "Green Glen Layout" },
+  landmark: { type: "string", example: "Near Lake Park" },
+  city: { type: "string", example: "Bengaluru" },
+  state: { type: "string", example: "Karnataka" },
+  pincode: { type: "string", example: "560103" },
+  latitude: { type: "string", example: "12.9279" },
+  longitude: { type: "string", example: "77.6801" },
+  isDefault: { type: "boolean", example: true }
+});
+
+const vendorListRes = rArr({
+  id: { type: "integer", example: 2 },
+  name: { type: "string", example: "Fresh Bakers" },
+  description: { type: "string", example: "Healthy food & pastries" },
+  logoUrl: { type: "string", example: "https://cdn.com/fresh_bakers.jpg" },
+  rating: { type: "string", example: "4.5" },
+  status: { type: "string", example: "ACTIVE" }
+});
+
+const menuRes = rObj({
+  categories: {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        id: { type: "integer", example: 10 },
+        name: { type: "string", example: "Desserts" },
+        description: { type: "string", example: "Sweet treats" }
+      }
+    }
+  },
+  items: {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        id: { type: "integer", example: 101 },
+        categoryId: { type: "integer", example: 10 },
+        name: { type: "string", example: "Choco Lava Cake" },
+        price: { type: "string", example: "120.00" },
+        isVeg: { type: "boolean", example: true },
+        status: { type: "string", example: "ACTIVE" }
+      }
+    }
+  }
+});
+
+const cartRes = rArr({
+  id: { type: "integer", example: 50 },
+  customerId: { type: "integer", example: 1 },
+  vendorId: { type: "integer", example: 2 },
+  status: { type: "string", example: "ACTIVE" },
+  items: {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        id: { type: "integer", example: 201 },
+        cartId: { type: "integer", example: 50 },
+        menuItemId: { type: "integer", example: 101 },
+        quantity: { type: "integer", example: 2 },
+        price: { type: "string", example: "120.00" }
+      }
+    }
+  }
+});
+
+const orderRes = rObj({
+  id: { type: "integer", example: 45 },
+  orderNumber: { type: "string", example: "ORD-00045" },
+  customerId: { type: "integer", example: 1 },
+  vendorId: { type: "integer", example: 2 },
+  addressId: { type: "integer", example: 5 },
+  subtotal: { type: "string", example: "240.00" },
+  taxAmount: { type: "string", example: "12.00" },
+  deliveryFee: { type: "string", example: "40.00" },
+  platformFee: { type: "string", example: "10.00" },
+  totalAmount: { type: "string", example: "302.00" },
+  status: { type: "string", example: "PLACED" },
+  paymentMethod: { type: "string", example: "UPI" }
+});
+
+const trackingRes = rArr({
+  id: { type: "integer", example: 12 },
+  orderId: { type: "integer", example: 45 },
+  status: { type: "string", example: "PREPARING" },
+  title: { type: "string", example: "Preparing Food" },
+  createdAt: { type: "string", example: "2026-06-04T12:00:00Z" }
+});
+
 /** OpenAPI path helper — keeps swagger spec DRY */
-const op = (tag: string, summary: string, secure = true, body?: Record<string, unknown>) => ({
+const op = (tag: string, summary: string, secure = true, body?: Record<string, unknown>, responseSchema?: Record<string, unknown>) => ({
   tags: [tag],
   summary,
   ...(secure ? { security: [{ bearerAuth: [] }] } : {}),
   ...(body ? { requestBody: { content: { "application/json": { schema: body } } } } : {}),
   responses: {
-    200: { description: "Success" },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
+    200: {
+      description: "Success",
+      content: {
+        "application/json": {
+          schema: responseSchema || { $ref: "#/components/schemas/SuccessResponse" }
+        }
+      }
+    },
+    401: {
+      description: "Unauthorized",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    },
+    403: {
+      description: "Forbidden",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+    },
   },
 });
 
@@ -25,7 +186,7 @@ export const openapiPaths = {
       type: "object",
       required: ["phone"],
       properties: { phone: { type: "string", example: "9876543210" } },
-    }),
+    }, sendOtpRes),
   },
   "/api/auth/verify-otp": {
     post: op("Auth", "Verify OTP — signup or login (public)", false, {
@@ -37,14 +198,14 @@ export const openapiPaths = {
         name: { type: "string", description: "Required for new users" },
         role: { type: "string", enum: ["CUSTOMER", "VENDOR", "RIDER"] },
       },
-    }),
+    }, verifyOtpRes),
   },
   "/api/auth/login": {
     post: op("Auth", "Email + password login (public)", false, {
       type: "object",
       required: ["email", "password"],
       properties: { email: { type: "string" }, password: { type: "string" } },
-    }),
+    }, verifyOtpRes),
   },
   "/api/auth/refresh-token": {
     post: op("Auth", "Refresh access token (public)", false, {
@@ -54,41 +215,41 @@ export const openapiPaths = {
     }),
   },
   "/api/auth/logout": { post: op("Auth", "Logout — invalidate refresh token") },
-  "/api/auth/me": { get: op("Auth", "Get current logged-in user") },
+  "/api/auth/me": { get: op("Auth", "Get current logged-in user", true, undefined, meRes) },
 
   // ─── CUSTOMER ───
   "/api/customer/profile": {
-    get: op("Customer", "Get profile"),
-    patch: op("Customer", "Update profile", true, { type: "object" }),
+    get: op("Customer", "Get profile", true, undefined, profileRes),
+    patch: op("Customer", "Update profile", true, { type: "object" }, profileRes),
   },
   "/api/customer/addresses": {
-    get: op("Customer", "List addresses"),
-    post: op("Customer", "Add address", true, { type: "object" }),
+    get: op("Customer", "List addresses", true, undefined, addressRes),
+    post: op("Customer", "Add address", true, { type: "object" }, addressRes),
   },
   "/api/customer/addresses/{id}": {
-    patch: { ...op("Customer", "Update address"), parameters: [idParam] },
+    patch: { ...op("Customer", "Update address", true, { type: "object" }, addressRes), parameters: [idParam] },
     delete: { ...op("Customer", "Delete address (soft)"), parameters: [idParam] },
   },
-  "/api/customer/vendors": { get: { ...op("Customer", "List vendors"), parameters: [{ name: "zoneId", in: "query", schema: { type: "integer" } }] } },
-  "/api/customer/vendors/{id}": { get: { ...op("Customer", "Vendor details"), parameters: [idParam] } },
-  "/api/customer/vendors/{id}/menu": { get: { ...op("Customer", "Vendor menu"), parameters: [idParam] } },
-  "/api/customer/search": { get: { ...op("Customer", "Search vendors & items"), parameters: [{ name: "query", in: "query", required: true, schema: { type: "string" } }] } },
+  "/api/customer/vendors": { get: { ...op("Customer", "List vendors", true, undefined, vendorListRes), parameters: [{ name: "zoneId", in: "query", schema: { type: "integer" } }] } },
+  "/api/customer/vendors/{id}": { get: { ...op("Customer", "Vendor details", true, undefined, vendorListRes), parameters: [idParam] } },
+  "/api/customer/vendors/{id}/menu": { get: { ...op("Customer", "Vendor menu", true, undefined, menuRes), parameters: [idParam] } },
+  "/api/customer/search": { get: { ...op("Customer", "Search vendors & items", true, undefined, menuRes), parameters: [{ name: "query", in: "query", required: true, schema: { type: "string" } }] } },
   "/api/customer/categories": { get: op("Customer", "List categories") },
   "/api/customer/cart": {
-    get: op("Customer", "Get cart"),
+    get: op("Customer", "Get cart", true, undefined, cartRes),
     delete: op("Customer", "Clear cart"),
   },
-  "/api/customer/cart/items": { post: op("Customer", "Add item to cart", true, { type: "object" }) },
+  "/api/customer/cart/items": { post: op("Customer", "Add item to cart", true, { type: "object" }, cartRes) },
   "/api/customer/cart/items/{id}": {
-    patch: { ...op("Customer", "Update cart item qty"), parameters: [idParam] },
+    patch: { ...op("Customer", "Update cart item qty", true, { type: "object" }, cartRes), parameters: [idParam] },
     delete: { ...op("Customer", "Remove cart item"), parameters: [idParam] },
   },
   "/api/customer/orders": {
-    get: op("Customer", "List my orders"),
-    post: op("Customer", "Place order from cart", true, { type: "object" }),
+    get: op("Customer", "List my orders", true, undefined, orderRes),
+    post: op("Customer", "Place order from cart", true, { type: "object" }, orderRes),
   },
-  "/api/customer/orders/{id}": { get: { ...op("Customer", "Order details"), parameters: [idParam] } },
-  "/api/customer/orders/{id}/tracking": { get: { ...op("Customer", "Live tracking timeline"), parameters: [idParam] } },
+  "/api/customer/orders/{id}": { get: { ...op("Customer", "Order details", true, undefined, orderRes), parameters: [idParam] } },
+  "/api/customer/orders/{id}/tracking": { get: { ...op("Customer", "Live tracking timeline", true, undefined, trackingRes), parameters: [idParam] } },
   "/api/customer/orders/{id}/cancel": { post: { ...op("Customer", "Cancel order"), parameters: [idParam] } },
   "/api/customer/payments/initiate": { post: op("Customer", "Initiate Razorpay payment", true, { type: "object" }) },
   "/api/customer/payments/verify": { post: op("Customer", "Verify Razorpay payment", true, { type: "object" }) },
