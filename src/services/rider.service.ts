@@ -36,7 +36,7 @@ export const setAvailability = async (userId: number, isOnline: boolean) => {
 /** POST /location — push GPS */
 export const pushLocation = async (userId: number, body: { orderId?: number; latitude: number; longitude: number }) => {
   const rider = await getRiderByUserId(userId);
-  if (body.orderId) {
+  if (body.orderId && Number.isFinite(body.orderId)) {
     await db.insert(deliveryTrackingEvents).values({
       orderId: body.orderId,
       riderId: rider.id,
@@ -69,6 +69,9 @@ export const getOrder = async (userId: number, orderId: number) => {
 };
 
 const assignmentAction = async (userId: number, orderId: number, status: string, orderStatus: string, title: string) => {
+  if (!orderId || !Number.isFinite(orderId)) {
+    throw new AppError(400, "Invalid order ID", "INVALID_ORDER_ID");
+  }
   const rider = await getRiderByUserId(userId);
   const [a] = await db
     .update(riderAssignments)
@@ -76,8 +79,13 @@ const assignmentAction = async (userId: number, orderId: number, status: string,
     .where(and(eq(riderAssignments.orderId, orderId), eq(riderAssignments.riderId, rider.id)))
     .returning();
   if (!a) throw new AppError(404, "Assignment not found", "NOT_FOUND");
-  await db.update(orders).set({ riderId: rider.id }).where(eq(orders.id, orderId));
-  await recordOrderStatus(orderId, orderStatus, title, userId);
+  try {
+    await db.update(orders).set({ riderId: rider.id }).where(eq(orders.id, orderId));
+    await recordOrderStatus(orderId, orderStatus, title, userId);
+  } catch (err) {
+    console.error(`assignmentAction post-update error for order ${orderId}:`, err);
+    // Assignment was already updated, so don't throw — just log
+  }
   return a;
 };
 

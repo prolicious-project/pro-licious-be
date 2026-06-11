@@ -37,30 +37,45 @@ export const registerSocketHandlers = (io: Server) => {
     socket.on(
       "rider_location_update",
       async ({ orderId, riderId, latitude, longitude }: { orderId: number; riderId: number; latitude: number; longitude: number }) => {
-        await db.insert(deliveryTrackingEvents).values({
-          orderId,
-          riderId,
-          eventType: "LOCATION_UPDATE",
-          latitude: String(latitude),
-          longitude: String(longitude),
-        });
-        io.to(`order:${orderId}`).emit("rider_location", { riderId, latitude, longitude, timestamp: new Date() });
+        try {
+          if (!orderId || !Number.isFinite(orderId) || !riderId || !Number.isFinite(riderId)) return;
+          await db.insert(deliveryTrackingEvents).values({
+            orderId,
+            riderId,
+            eventType: "LOCATION_UPDATE",
+            latitude: String(latitude),
+            longitude: String(longitude),
+          });
+          io.to(`order:${orderId}`).emit("rider_location", { riderId, latitude, longitude, timestamp: new Date() });
+        } catch (err) {
+          console.error("rider_location_update error:", err instanceof Error ? err.message : err);
+        }
       },
     );
 
     /** Rider goes online */
     socket.on("rider_go_online", async ({ riderId }: { riderId: number }) => {
-      await db.update(riderAvailability).set({ isOnline: true, lastSeen: new Date() }).where(eq(riderAvailability.riderId, riderId));
-      io.emit("rider_online", { riderId, isOnline: true });
-      // emit any pending assignments to this rider room
-      const pending = await db.select().from(riderAssignments).where(and(eq(riderAssignments.riderId, riderId), or(eq(riderAssignments.status, "ASSIGNED"), eq(riderAssignments.status, "ACCEPTED"))));
-      io.to(`rider:${riderId}`).emit("pending_assignments", { assignments: pending });
+      try {
+        if (!riderId || !Number.isFinite(riderId)) return;
+        await db.update(riderAvailability).set({ isOnline: true, lastSeen: new Date() }).where(eq(riderAvailability.riderId, riderId));
+        io.emit("rider_online", { riderId, isOnline: true });
+        // emit any pending assignments to this rider room
+        const pending = await db.select().from(riderAssignments).where(and(eq(riderAssignments.riderId, riderId), or(eq(riderAssignments.status, "ASSIGNED"), eq(riderAssignments.status, "ACCEPTED"))));
+        io.to(`rider:${riderId}`).emit("pending_assignments", { assignments: pending });
+      } catch (err) {
+        console.error("rider_go_online error:", err instanceof Error ? err.message : err);
+      }
     });
 
     /** Rider goes offline */
     socket.on("rider_go_offline", async ({ riderId }: { riderId: number }) => {
-      await db.update(riderAvailability).set({ isOnline: false, lastSeen: new Date() }).where(eq(riderAvailability.riderId, riderId));
-      io.emit("rider_offline", { riderId, isOnline: false });
+      try {
+        if (!riderId || !Number.isFinite(riderId)) return;
+        await db.update(riderAvailability).set({ isOnline: false, lastSeen: new Date() }).where(eq(riderAvailability.riderId, riderId));
+        io.emit("rider_offline", { riderId, isOnline: false });
+      } catch (err) {
+        console.error("rider_go_offline error:", err instanceof Error ? err.message : err);
+      }
     });
 
     // In socket/handlers.ts - Add this event handler
@@ -94,13 +109,18 @@ socket.on("assign_rider_to_order", async ({ orderId, vendorId }) => {
 
     /** Verify delivery OTP via socket */
     socket.on("verify_delivery_otp", async ({ orderId, otp }: { orderId: number; otp: string }) => {
-      const hash = await getOtpRedis(`delivery:${orderId}`);
-      if (hash && (await verifyOTP(otp, hash))) {
-        await db.update(orders).set({ status: "DELIVERED" }).where(eq(orders.id, orderId));
-        io.to(`order:${orderId}`).emit("order_delivered", { orderId, message: "Order delivered successfully" });
-        io.to(`order:${orderId}`).emit("delivery_confirmed", { orderId, message: "Delivery confirmed" });
-      } else {
-        socket.emit("error", { message: "Invalid OTP" });
+      try {
+        const hash = await getOtpRedis(`delivery:${orderId}`);
+        if (hash && (await verifyOTP(otp, hash))) {
+          await db.update(orders).set({ status: "DELIVERED" }).where(eq(orders.id, orderId));
+          io.to(`order:${orderId}`).emit("order_delivered", { orderId, message: "Order delivered successfully" });
+          io.to(`order:${orderId}`).emit("delivery_confirmed", { orderId, message: "Delivery confirmed" });
+        } else {
+          socket.emit("error", { message: "Invalid OTP" });
+        }
+      } catch (err) {
+        console.error("verify_delivery_otp error:", err instanceof Error ? err.message : err);
+        socket.emit("error", { message: "OTP verification failed" });
       }
     });
 
