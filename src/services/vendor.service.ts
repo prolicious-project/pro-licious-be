@@ -177,6 +177,23 @@ export const getOrder = async (userId: number, orderId: number) => {
 const vendorOrderAction = async (userId: number, orderId: number, status: string, title: string) => {
   const order = await getOrder(userId, orderId);
   await recordOrderStatus(orderId, status, title, userId);
+
+  // For ACCEPTED orders, attempt to assign a rider immediately and emit notifications
+  if (status === "ACCEPTED") {
+    try {
+      const assignmentResult = await assignRiderToOrder(orderId);
+      if (assignmentResult && assignmentResult.rider) {
+        emitRiderAssigned(orderId, {
+          riderId: assignmentResult.rider.id,
+          riderName: assignmentResult.user?.name,
+          riderPhone: assignmentResult.user?.phone,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to assign rider on ACCEPTED status:", err);
+    }
+  }
+
   return order;
 };
 

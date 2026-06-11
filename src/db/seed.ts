@@ -278,7 +278,7 @@ async function seed() {
       riderId,
       isOnline: true,
       activeOrders: 0
-    });
+    }).onConflictDoNothing();
 
     console.log("✅ Comprehensive seeding completed successfully!");
     console.log("📝 Demo Accounts:");

@@ -677,7 +677,115 @@ Requires `role` of the authenticated user to be `"RIDER"`.
     ```
 *   **How & Where to Use**: A master switch on the rider homepage to start/stop receiving order assignments.
 
-#### 2. Send Live GPS Coordinate Updates
+#### 2. List Assigned Orders (Dashboard Queue)
+*   **Method**: `GET`
+*   **Endpoint**: `/api/rider/orders`
+*   **Auth Required**: Yes
+*   **Request Body**: **NONE**
+*   **Expected Response (200 OK)**:
+    ```json
+    {
+      "success": true,
+      "message": "OK",
+      "data": [
+        {
+          "assignmentId": 34,
+          "riderId": 1,
+          "assignmentStatus": "REJECTED",
+          "assignedAt": "2026-06-11T11:22:23.961Z",
+          "acceptedAt": null,
+          "completedAt": null,
+          "orderId": 31,
+          "orderNumber": "ORD-00031",
+          "customerId": 5,
+          "vendorId": 2,
+          "branchId": null,
+          "orderRiderId": null,
+          "addressId": 10,
+          "subtotal": "250.00",
+          "taxAmount": "25.00",
+          "deliveryFee": "40.00",
+          "platformFee": "15.00",
+          "discountAmount": "0.00",
+          "totalAmount": "330.00",
+          "orderStatus": "PLACED",
+          "paymentMethod": "UPI",
+          "orderCreatedAt": "2026-06-11T10:30:00.000Z",
+          "orderUpdatedAt": "2026-06-11T10:30:00.000Z",
+          "items": [
+            {
+              "id": 101,
+              "orderId": 31,
+              "menuItemId": 5,
+              "itemName": "Margherita Pizza",
+              "price": "200.00",
+              "quantity": 1,
+              "total": "200.00",
+              "customizations": {}
+            }
+          ],
+          "address": {
+            "id": 10,
+            "customerId": 5,
+            "addressType": "HOME",
+            "houseNumber": "Apt 101",
+            "street": "Main Street",
+            "landmark": "Near Park",
+            "city": "Bengaluru",
+            "state": "Karnataka",
+            "pincode": "560001",
+            "latitude": "12.9716",
+            "longitude": "77.5946",
+            "isDefault": true
+          }
+        }
+      ]
+    }
+    ```
+*   **How & Where to Use**: Render the real-time incoming delivery request dashboard. Shows all active assignment requests with full order & address details.
+
+#### 3. Get Single Order Details
+*   **Method**: `GET`
+*   **Endpoint**: `/api/rider/orders/:id`
+*   **Auth Required**: Yes
+*   **Path Parameter**: `:id` (Order ID)
+*   **Request Body**: **NONE**
+*   **Expected Response (200 OK)**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "assignmentId": 34,
+        "riderId": 1,
+        "assignmentStatus": "REJECTED",
+        "assignedAt": "2026-06-11T11:22:23.961Z",
+        "acceptedAt": null,
+        "completedAt": null,
+        "orderId": 31,
+        "orderNumber": "ORD-00031",
+        "customerId": 5,
+        "vendorId": 2,
+        "branchId": null,
+        "orderRiderId": null,
+        "addressId": 10,
+        "subtotal": "250.00",
+        "taxAmount": "25.00",
+        "deliveryFee": "40.00",
+        "platformFee": "15.00",
+        "discountAmount": "0.00",
+        "totalAmount": "330.00",
+        "orderStatus": "PLACED",
+        "paymentMethod": "UPI",
+        "orderCreatedAt": "2026-06-11T10:30:00.000Z",
+        "orderUpdatedAt": "2026-06-11T10:30:00.000Z",
+        "items": [...],
+        "address": {...}
+      }
+    }
+    ```
+*   **How & Where to Use**: Tap on an order from the queue to view full details before accepting/rejecting it.
+
+#### 4. Send Live GPS Coordinate Updates
 *   **Method**: `POST`
 *   **Endpoint**: `/api/rider/location`
 *   **Request Body**:
@@ -690,20 +798,20 @@ Requires `role` of the authenticated user to be `"RIDER"`.
     ```
 *   **How & Where to Use**: Call inside a background GPS service every 15–30 seconds when the rider has an active delivery. This feeds the customer-facing map.
 
-#### 3. Accept/Reject Delivery Requests
+#### 5. Accept/Reject Delivery Requests
 *   **Accept Delivery**: `PATCH /api/rider/orders/:id/accept`
 *   **Reject Delivery**: `PATCH /api/rider/orders/:id/reject`
 *   **Request Body**: **NONE**
 *   **How & Where to Use**: When an order request pops up on the Rider app.
 
-#### 4. Delivery Status Timeline Actions
+#### 6. Delivery Status Timeline Actions
 As the rider travels, they click buttons in their app to trigger these. No request body is needed.
 *   **Arrive at Restaurant**: `PATCH /api/rider/orders/:id/arrived-vendor`
 *   **Pick Up Package**: `PATCH /api/rider/orders/:id/picked-up`
 *   **Arrive at Home**: `PATCH /api/rider/orders/:id/arrived-customer`
 *   **Request Body**: **NONE**
 
-#### 5. Verify Delivery OTP & Complete Drop-off
+#### 7. Verify Delivery OTP & Complete Drop-off
 *   **Method**: `POST`
 *   **Endpoint**: `/api/rider/orders/:id/deliver`
 *   **Path Parameter**: `:id` (Order ID)

@@ -49,10 +49,60 @@ export const pushLocation = async (userId: number, body: { orderId?: number; lat
   return { message: "Location updated" };
 };
 
-/** GET /orders */
+/** GET /orders — return enriched assignments with order details */
 export const listOrders = async (userId: number) => {
   const rider = await getRiderByUserId(userId);
-  return db.select().from(riderAssignments).where(eq(riderAssignments.riderId, rider.id)).orderBy(desc(riderAssignments.assignedAt));
+  const assigns = await db
+    .select()
+    .from(riderAssignments)
+    .where(eq(riderAssignments.riderId, rider.id))
+    .orderBy(desc(riderAssignments.assignedAt));
+
+  // Enrich each assignment with order, items, and address details
+  const results: any[] = [];
+  for (const a of assigns) {
+    const [order] = await db.select().from(orders).where(eq(orders.id, a.orderId));
+    const items = order ? await db.select().from(orderItems).where(eq(orderItems.orderId, a.orderId)) : [];
+    const address = order?.addressId
+      ? (await db.select().from(customerAddresses).where(eq(customerAddresses.id, order.addressId)))[0]
+      : null;
+
+    // Flatten response: include all assignment and order details
+    const result: any = {
+      // Assignment details
+      assignmentId: a.id,
+      riderId: a.riderId,
+      assignmentStatus: a.status,
+      assignedAt: a.assignedAt,
+      acceptedAt: a.acceptedAt,
+      completedAt: a.completedAt,
+
+      // Order details
+      orderId: a.orderId,
+      orderNumber: order?.orderNumber,
+      customerId: order?.customerId,
+      vendorId: order?.vendorId,
+      branchId: order?.branchId,
+      orderRiderId: order?.riderId,
+      addressId: order?.addressId,
+      subtotal: order?.subtotal,
+      taxAmount: order?.taxAmount,
+      deliveryFee: order?.deliveryFee,
+      platformFee: order?.platformFee,
+      discountAmount: order?.discountAmount,
+      totalAmount: order?.totalAmount,
+      orderStatus: order?.status,
+      paymentMethod: order?.paymentMethod,
+      orderCreatedAt: order?.createdAt,
+      orderUpdatedAt: order?.updatedAt,
+
+      // Related data
+      items,
+      address,
+    };
+    results.push(result);
+  }
+  return results;
 };
 
 /** GET /orders/:id */

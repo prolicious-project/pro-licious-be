@@ -8,6 +8,18 @@
 
 ---
 
+## 🛠 Recent Fixes (2026-06-11)
+
+Summary of backend fixes applied during troubleshooting:
+
+- **Cart / Order Placement:** Fixed unique-constraint failure when placing orders by cleaning up old `ABANDONED` carts before updating statuses. (Changed: `src/services/customer.service.ts`)
+- **Rider Location Route:** Added `POST /api/rider/location/update` to match frontend calls. (Changed: `src/routes/rider.routes.ts`)
+- **Socket.IO handlers:** Repaired Socket.IO issues: replaced an absolute import path with a relative import and fixed an incorrectly nested `assign_rider_to_order` handler so events are emitted correctly. (Changed: `src/socket/handlers.ts`, `src/socket/index.ts`)
+
+Files modified during debugging are listed above; test the flow by placing an order, marking it READY as a vendor, and ensuring a connected rider receives `pending_assignments` / `new_order_assigned` socket events.
+
+---
+
 ## 📋 Table of Contents
 
 1. [Quick Start](#quick-start)

@@ -181,7 +181,7 @@ CREATE TABLE IF NOT EXISTS vendor_branches (
 CREATE INDEX IF NOT EXISTS idx_vbranches_vendor_id ON vendor_branches(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_vbranches_zone_id   ON vendor_branches(zone_id);
 
-
+   
 CREATE TABLE IF NOT EXISTS vendor_operating_hours (
   id            BIGSERIAL     PRIMARY KEY,
   branch_id     BIGINT        NOT NULL REFERENCES vendor_branches(id) ON DELETE CASCADE,
