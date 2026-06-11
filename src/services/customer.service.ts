@@ -214,13 +214,24 @@ export const placeOrder = async (
   const items = await db.select().from(cartItems).where(eq(cartItems.cartId, cart.id));
   if (!items.length) throw new AppError(400, "Cart is empty", "MISSING_FIELDS");
 
-  // Transactionally abandon any prior CONVERTED cart and mark current as CONVERTED
-  // (must happen FIRST to avoid unique constraint violation when creating order)
+  // Transactionally clean up old carts and mark current as CONVERTED
+  // Delete any existing ABANDONED cart first to avoid unique constraint violation
   await db.transaction(async (tx) => {
+    // Delete any old abandoned cart items
+    const oldAbandoned = await tx
+      .select()
+      .from(carts)
+      .where(and(eq(carts.customerId, c.id), eq(carts.vendorId, body.vendorId), eq(carts.status, "ABANDONED")));
+    for (const oldCart of oldAbandoned) {
+      await tx.delete(cartItems).where(eq(cartItems.cartId, oldCart.id));
+      await tx.delete(carts).where(eq(carts.id, oldCart.id));
+    }
+    // Abandon any prior CONVERTED cart
     await tx
       .update(carts)
       .set({ status: "ABANDONED" })
       .where(and(eq(carts.customerId, c.id), eq(carts.vendorId, body.vendorId), eq(carts.status, "CONVERTED")));
+    // Mark current cart as CONVERTED
     await tx.update(carts).set({ status: "CONVERTED" }).where(eq(carts.id, cart.id));
   });
 
@@ -236,7 +247,7 @@ export const placeOrder = async (
     .values({
       orderNumber: "TEMP",
       customerId: c.id,
-      vendorId: body.vendorId,
+      vendorId: body.vendorId,          
       addressId: body.addressId,
       subtotal: String(subtotal),
       taxAmount: String(taxAmount),

@@ -15,9 +15,10 @@ const parseId = (req: Request): number => {
   return id;
 };
 
-/** Rider routes — 18 endpoints */
+/** Rider routes — 19 endpoints */
 router.patch("/availability", asyncHandler(async (req, res) => successResponse(res, await svc.setAvailability(uid(req), req.body.isOnline))));
 router.post("/location", asyncHandler(async (req, res) => successResponse(res, await svc.pushLocation(uid(req), req.body))));
+router.post("/location/update", asyncHandler(async (req, res) => successResponse(res, await svc.pushLocation(uid(req), req.body))));
 router.get("/orders", asyncHandler(async (req, res) => successResponse(res, await svc.listOrders(uid(req)))));
 router.get("/orders/:id", asyncHandler(async (req, res) => successResponse(res, await svc.getOrder(uid(req), parseId(req)))));
 router.patch("/orders/:id/accept", asyncHandler(async (req, res) => successResponse(res, await svc.acceptOrder(uid(req), parseId(req)))));
