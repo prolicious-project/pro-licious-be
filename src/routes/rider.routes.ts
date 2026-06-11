@@ -11,9 +11,12 @@ const uid = (req: Request) => req.user!.id;
 
 /** Rider routes — 18 endpoints */
 router.patch("/availability", asyncHandler(async (req, res) => successResponse(res, await svc.setAvailability(uid(req), req.body.isOnline))));
+router.get("/availability", asyncHandler(async (req, res) => successResponse(res, await svc.getAvailability(uid(req)))));
 router.post("/location", asyncHandler(async (req, res) => successResponse(res, await svc.pushLocation(uid(req), req.body))));
 router.get("/orders", asyncHandler(async (req, res) => successResponse(res, await svc.listOrders(uid(req)))));
 router.get("/orders/:id", asyncHandler(async (req, res) => successResponse(res, await svc.getOrder(uid(req), +req.params.id))));
+router.get("/orders/:id/messages", asyncHandler(async (req, res) => successResponse(res, await svc.getOrderMessages(uid(req), +req.params.id))));
+router.post("/orders/:id/messages", asyncHandler(async (req, res) => successResponse(res, await svc.sendOrderMessage(uid(req), +req.params.id, req.body.message))));
 router.patch("/orders/:id/accept", asyncHandler(async (req, res) => successResponse(res, await svc.acceptOrder(uid(req), +req.params.id))));
 router.patch("/orders/:id/reject", asyncHandler(async (req, res) => successResponse(res, await svc.rejectOrder(uid(req), +req.params.id))));
 router.patch("/orders/:id/arrived-vendor", asyncHandler(async (req, res) => successResponse(res, await svc.arrivedVendor(uid(req), +req.params.id))));

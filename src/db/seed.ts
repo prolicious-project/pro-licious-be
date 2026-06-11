@@ -93,9 +93,9 @@ async function seed() {
     // 4. Addresses & Zones
     console.log("Seeding zones and addresses...");
     const [zone] = await db.insert(schema.zones).values({
-      zoneName: "Downtown Mumbai", 
-      city: "Mumbai", 
-      state: "Maharashtra", 
+      zoneName: "Gachibowli Zone", 
+      city: "Hyderabad", 
+      state: "Telangana", 
       status: "ACTIVE"
     }).returning();
 
@@ -103,24 +103,24 @@ async function seed() {
       customerId, 
       addressType: "HOME", 
       houseNumber: "12A", 
-      street: "Linking Road",
+      street: "Jubilee Hills",
       landmark: "Near Metro Station",
-      city: "Mumbai", 
-      state: "Maharashtra", 
-      pincode: "400050", 
-      latitude: "19.0596", 
-      longitude: "72.8295", 
+      city: "Hyderabad", 
+      state: "Telangana", 
+      pincode: "500033", 
+      latitude: "17.4325", 
+      longitude: "78.4071", 
       isDefault: true
     }).returning();
 
     const [branch] = await db.insert(schema.vendorBranches).values({
       vendorId, 
       zoneId: zone.id, 
-      branchName: "Bandra Branch", 
+      branchName: "Gachibowli Branch", 
       phone: "9876543211", 
-      address: "Bandra West",
-      latitude: "19.0544", 
-      longitude: "72.8339", 
+      address: "Gachibowli Hub",
+      latitude: "17.4483", 
+      longitude: "78.3488", 
       status: "ACTIVE"
     }).returning();
 
@@ -278,7 +278,40 @@ async function seed() {
       riderId,
       isOnline: true,
       activeOrders: 0
-    });
+    }).onConflictDoNothing();
+
+    // Vendor Settlements
+    console.log("Seeding vendor settlements...");
+    await db.insert(schema.vendorSettlements).values([
+      { 
+        vendorId, 
+        settlementAmount: "350.00", 
+        settlementDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+        status: "COMPLETED" 
+      },
+      { 
+        vendorId, 
+        settlementAmount: "120.00", 
+        settlementDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+        status: "COMPLETED" 
+      },
+      { 
+        vendorId, 
+        settlementAmount: "450.00", 
+        settlementDate: new Date().toISOString().split('T')[0], 
+        status: "PENDING" 
+      }
+    ]).onConflictDoNothing();
+
+    // Vendor Performance Metrics
+    console.log("Seeding vendor performance metrics...");
+    await db.insert(schema.vendorPerformanceMetrics).values({
+      vendorId,
+      acceptanceRate: "96.50",
+      cancellationRate: "2.10",
+      averagePreparationTime: 12,
+      slaScore: "98.20"
+    }).onConflictDoNothing();
 
     console.log("✅ Comprehensive seeding completed successfully!");
     console.log("📝 Demo Accounts:");

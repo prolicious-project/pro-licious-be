@@ -186,14 +186,36 @@ export const analyticsSummary = async (userId: number) => {
   const vendor = await getVendorByUserId(userId);
   const allOrders = await db.select().from(orders).where(eq(orders.vendorId, vendor.id));
   const completed = allOrders.filter((o) => o.status === "DELIVERED");
+  const pending = allOrders.filter((o) => ["PLACED", "ACCEPTED", "PREPARING", "READY"].includes(o.status));
   const revenue = completed.reduce((s, o) => s + Number(o.totalAmount), 0);
-  return { totalOrders: allOrders.length, completedOrders: completed.length, revenue };
+  return { 
+    totalOrders: allOrders.length, 
+    completedOrders: completed.length, 
+    pendingOrders: pending.length,
+    revenue,
+    totalRevenue: revenue 
+  };
 };
 
 export const analyticsDaily = async (userId: number) => {
   const vendor = await getVendorByUserId(userId);
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  return db.select().from(orders).where(and(eq(orders.vendorId, vendor.id), gte(orders.createdAt, since))).orderBy(desc(orders.createdAt));
+  return db
+    .select({
+      date: sql<string>`TO_CHAR(${orders.createdAt}, 'YYYY-MM-DD')`,
+      revenue: sql<string>`SUM(${orders.totalAmount})::text`,
+      orderCount: sql<number>`count(${orders.id})::integer`,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.vendorId, vendor.id),
+        eq(orders.status, "DELIVERED"),
+        gte(orders.createdAt, since)
+      )
+    )
+    .groupBy(sql`TO_CHAR(${orders.createdAt}, 'YYYY-MM-DD')`)
+    .orderBy(sql`TO_CHAR(${orders.createdAt}, 'YYYY-MM-DD')`);
 };
 
 export const listTransactions = async (userId: number) => {

@@ -17,11 +17,15 @@ import {
   supportTickets,
   notifications,
   users,
+  vendorBranches,
+  riders,
+  orderMessages,
 } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { getCustomerByUserId, generateOrderNumber, recordOrderStatus } from "../lib/helpers";
 import { createRazorpayOrder, verifyRazorpaySignature } from "../config/razorpay";
 import { env } from "../config/env";
+import { redisGet } from "../utils/redis";
 
 const customer = (userId: number) => getCustomerByUserId(userId);
 
@@ -272,7 +276,31 @@ export const getOrder = async (userId: number, orderId: number) => {
     .where(and(eq(orders.id, orderId), eq(orders.customerId, c.id)));
   if (!order) throw new AppError(404, "Order not found", "ORDER_NOT_FOUND");
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-  return { ...order, items };
+  const address = order.addressId
+    ? (await db.select().from(customerAddresses).where(eq(customerAddresses.id, order.addressId)))[0]
+    : null;
+  const branch = order.branchId
+    ? (await db.select().from(vendorBranches).where(eq(vendorBranches.id, order.branchId)))[0]
+    : null;
+  let riderUser = null;
+  if (order.riderId) {
+    const [rider] = await db.select().from(riders).where(eq(riders.id, order.riderId));
+    if (rider) {
+      const [u] = await db.select().from(users).where(eq(users.id, rider.userId));
+      riderUser = u ? { id: rider.id, name: u.name, phone: u.phone } : null;
+    }
+  }
+
+  let deliveryOtp = null;
+  const [cust] = await db.select().from(customerProfiles).where(eq(customerProfiles.id, order.customerId));
+  if (cust) {
+    const [u] = await db.select().from(users).where(eq(users.id, cust.userId));
+    if (u && u.phone) {
+      deliveryOtp = await redisGet(`plain_delivery_otp:${u.phone}`);
+    }
+  }
+
+  return { ...order, items, address, branch, rider: riderUser, deliveryOtp };
 };
 
 export const getOrderTracking = async (userId: number, orderId: number) => {
@@ -299,7 +327,7 @@ export const initiatePayment = async (userId: number, orderId: number) => {
     .insert(payments)
     .values({ orderId, amount: order.totalAmount, paymentReference: rzOrder.id, status: "PENDING" })
     .returning();
-  return { paymentId: payment.id, razorpayOrderId: rzOrder.id, amount: order.totalAmount, key: env.RAZORPAY_KEY_ID };
+  return { paymentId: payment.id, razorpayOrderId: rzOrder.id, amount: order.totalAmount, key: env.RAZORPAY_KEY_ID, payment };
 };
 
 export const verifyPayment = async (
@@ -310,12 +338,13 @@ export const verifyPayment = async (
   if (!verifyRazorpaySignature(body.razorpayOrderId, body.razorpayPaymentId, body.razorpaySignature)) {
     throw new AppError(400, "Invalid payment signature", "BAD_REQUEST");
   }
-  await db
+  const [payment] = await db
     .update(payments)
     .set({ status: "SUCCESS", paymentReference: body.razorpayPaymentId })
-    .where(eq(payments.orderId, body.orderId));
+    .where(eq(payments.orderId, body.orderId))
+    .returning();
   await recordOrderStatus(body.orderId, "PAID", "Payment Successful", userId);
-  return { message: "Payment verified" };
+  return payment;
 };
 
 export const createComplaint = async (
@@ -367,4 +396,35 @@ export const removeFavorite = async (userId: number, vendorId: number) => {
     .delete(customerFavorites)
     .where(and(eq(customerFavorites.customerId, c.id), eq(customerFavorites.vendorId, vendorId)));
   return { message: "Removed from favorites" };
+};
+
+export const getOrderMessages = async (userId: number, orderId: number) => {
+  // Verify order details and ownership
+  await getOrder(userId, orderId);
+  return db
+    .select({
+      id: orderMessages.id,
+      orderId: orderMessages.orderId,
+      senderId: orderMessages.senderId,
+      message: orderMessages.message,
+      createdAt: orderMessages.createdAt,
+      senderName: users.name,
+    })
+    .from(orderMessages)
+    .innerJoin(users, eq(orderMessages.senderId, users.id))
+    .where(eq(orderMessages.orderId, orderId))
+    .orderBy(orderMessages.createdAt);
+};
+
+export const sendOrderMessage = async (userId: number, orderId: number, messageText: string) => {
+  await getOrder(userId, orderId);
+  const [msg] = await db
+    .insert(orderMessages)
+    .values({
+      orderId,
+      senderId: userId,
+      message: messageText,
+    })
+    .returning();
+  return msg;
 };

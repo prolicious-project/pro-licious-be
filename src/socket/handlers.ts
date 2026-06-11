@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { db } from "../db";
-import { deliveryTrackingEvents, riderAvailability, orders } from "../db/schema";
+import { deliveryTrackingEvents, riderAvailability, orders, orderMessages, users } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { verifyOTP, getOtpRedis } from "../utils/otp";
 
@@ -15,6 +15,28 @@ export const registerSocketHandlers = (io: Server) => {
       console.log(`User ${userId} (${role}) joined order:${orderId}`);
     });
 
+    /** User sends chat message inside order room */
+    socket.on("send_message", async ({ orderId, senderId, message }: { orderId: number; senderId: number; message: string }) => {
+      try {
+        const [msg] = await db.insert(orderMessages).values({
+          orderId,
+          senderId,
+          message
+        }).returning();
+
+        // Fetch sender name for dynamic layout rendering
+        const [user] = await db.select().from(users).where(eq(users.id, senderId));
+        const enrichedMsg = {
+          ...msg,
+          senderName: user?.name || "User"
+        };
+
+        io.to(`order:${orderId}`).emit("new_message", enrichedMsg);
+      } catch (err) {
+        console.error("Socket send_message error:", err);
+      }
+    });
+
     /** Rider pushes GPS location during delivery */
     socket.on(
       "rider_location_update",
@@ -27,6 +49,7 @@ export const registerSocketHandlers = (io: Server) => {
           longitude: String(longitude),
         });
         io.to(`order:${orderId}`).emit("rider_location", { riderId, latitude, longitude, timestamp: new Date() });
+        io.emit("admin_rider_location", { orderId, riderId, latitude, longitude, timestamp: new Date() });
       },
     );
 

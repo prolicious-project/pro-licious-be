@@ -32,8 +32,24 @@ router.get("/orders", asyncHandler(async (req, res) => successResponse(res, awai
 router.get("/orders/:id/tracking", asyncHandler(async (req, res) => successResponse(res, await svc.getOrderTracking(uid(req), +req.params.id))));
 router.get("/orders/:id", asyncHandler(async (req, res) => successResponse(res, await svc.getOrder(uid(req), +req.params.id))));
 router.post("/orders/:id/cancel", asyncHandler(async (req, res) => successResponse(res, await svc.cancelOrder(uid(req), +req.params.id))));
-router.post("/payments/initiate", asyncHandler(async (req, res) => successResponse(res, await svc.initiatePayment(uid(req), req.body.orderId))));
-router.post("/payments/verify", asyncHandler(async (req, res) => successResponse(res, await svc.verifyPayment(uid(req), req.body))));
+router.get("/orders/:id/messages", asyncHandler(async (req, res) => successResponse(res, await svc.getOrderMessages(uid(req), +req.params.id))));
+router.post("/orders/:id/messages", asyncHandler(async (req, res) => successResponse(res, await svc.sendOrderMessage(uid(req), +req.params.id, req.body.message))));
+router.post("/payments/initiate", asyncHandler(async (req, res) => {
+  const result = await svc.initiatePayment(uid(req), req.body.orderId);
+  const io = req.app.get("io");
+  if (io && result.payment) {
+    io.emit("payment_status", result.payment);
+  }
+  return successResponse(res, result);
+}));
+router.post("/payments/verify", asyncHandler(async (req, res) => {
+  const payment = await svc.verifyPayment(uid(req), req.body);
+  const io = req.app.get("io");
+  if (io) {
+    io.emit("payment_status", payment);
+  }
+  return successResponse(res, { message: "Payment verified", payment });
+}));
 router.post("/complaints", asyncHandler(async (req, res) => successResponse(res, await svc.createComplaint(uid(req), req.body), "Created", 201)));
 router.get("/complaints", asyncHandler(async (req, res) => successResponse(res, await svc.listComplaints(uid(req)))));
 router.post("/support/tickets", asyncHandler(async (req, res) => successResponse(res, await svc.createTicket(uid(req), req.body), "Created", 201)));

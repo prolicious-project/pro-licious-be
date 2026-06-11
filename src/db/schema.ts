@@ -1,4 +1,4 @@
-﻿import {
+import {
   bigint,
   bigserial,
   boolean,
@@ -607,5 +607,17 @@ export const riderPayoutTransactions = pgTable("rider_payout_transactions", {
   bankReference: varchar("bank_reference", { length: 100 }),
   amount: numeric({ precision: 10, scale: 2 }).notNull(),
   status: varchar({ length: 20 }).notNull().default("PENDING"),
+  createdAt: tsNow("created_at"),
+});
+
+export const orderMessages = pgTable("order_messages", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  orderId: bigint("order_id", { mode: "number" })
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  senderId: bigint("sender_id", { mode: "number" })
+    .notNull()
+    .references(() => users.id),
+  message: text("message").notNull(),
   createdAt: tsNow("created_at"),
 });

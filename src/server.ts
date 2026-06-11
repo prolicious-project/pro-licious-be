@@ -12,6 +12,8 @@ const io = new Server(httpServer, {
   cors: { origin: env.FRONTEND_URL, credentials: true },
 });
 
+app.set("io", io);
+
 registerSocketHandlers(io);
 
 const startServer = async () => {

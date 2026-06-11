@@ -14,10 +14,15 @@ import {
   riderPayoutTransactions,
   notifications,
   otpVerifications,
+  vendorBranches,
+  orderMessages,
+  users,
+  customerProfiles,
 } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { getRiderByUserId, recordOrderStatus } from "../lib/helpers";
 import { generateOTP, hashOTP, verifyOTP } from "../utils/otp";
+import { redisSet } from "../utils/redis";
 
 /** PATCH /availability — online/offline toggle */
 export const setAvailability = async (userId: number, isOnline: boolean) => {
@@ -30,6 +35,13 @@ export const setAvailability = async (userId: number, isOnline: boolean) => {
   const [u] = await db.insert(riderAvailability).values({ riderId: rider.id, isOnline, lastSeen: new Date() }).returning();
   if (isOnline) await db.insert(riderShiftLogs).values({ riderId: rider.id, loginTime: new Date() });
   return u;
+};
+
+/** GET /availability — get online status */
+export const getAvailability = async (userId: number) => {
+  const rider = await getRiderByUserId(userId);
+  const [existing] = await db.select().from(riderAvailability).where(eq(riderAvailability.riderId, rider.id));
+  return existing || { riderId: rider.id, isOnline: false, activeOrders: 0 };
 };
 
 /** POST /location — push GPS */
@@ -64,7 +76,10 @@ export const getOrder = async (userId: number, orderId: number) => {
   const address = order?.addressId
     ? (await db.select().from(customerAddresses).where(eq(customerAddresses.id, order.addressId)))[0]
     : null;
-  return { assignment, order, items, address };
+  const branch = order?.branchId
+    ? (await db.select().from(vendorBranches).where(eq(vendorBranches.id, order.branchId)))[0]
+    : null;
+  return { assignment, order, items, address, branch };
 };
 
 const assignmentAction = async (userId: number, orderId: number, status: string, orderStatus: string, title: string) => {
@@ -84,7 +99,24 @@ export const acceptOrder = (userId: number, orderId: number) => assignmentAction
 export const rejectOrder = (userId: number, orderId: number) => assignmentAction(userId, orderId, "REJECTED", "RIDER_REJECTED", "Rider Rejected");
 export const arrivedVendor = (userId: number, orderId: number) => assignmentAction(userId, orderId, "ACCEPTED", "ARRIVED_VENDOR", "Arrived at Vendor");
 export const pickedUp = (userId: number, orderId: number) => assignmentAction(userId, orderId, "ACCEPTED", "PICKED_UP", "Order Picked Up");
-export const arrivedCustomer = (userId: number, orderId: number) => assignmentAction(userId, orderId, "ACCEPTED", "ARRIVED_CUSTOMER", "Arrived at Customer");
+export const arrivedCustomer = async (userId: number, orderId: number) => {
+  const a = await assignmentAction(userId, orderId, "ACCEPTED", "ARRIVED_CUSTOMER", "Arrived at Customer");
+  try {
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+    if (order) {
+      const [cust] = await db.select().from(customerProfiles).where(eq(customerProfiles.id, order.customerId));
+      if (cust) {
+        const [u] = await db.select().from(users).where(eq(users.id, cust.userId));
+        if (u && u.phone) {
+          await createDeliveryOtp(u.phone);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error creating delivery OTP automatically:", err);
+  }
+  return a;
+};
 
 /** POST /orders/:id/deliver — OTP verify */
 export const deliverOrder = async (userId: number, orderId: number, otp: string) => {
@@ -152,5 +184,38 @@ export const createDeliveryOtp = async (phone: string) => {
     purpose: "DELIVERY_CONFIRM",
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
+  // Store plain text OTP in Redis for frontend testing
+  await redisSet(`plain_delivery_otp:${phone}`, otp, 600);
   return otp;
+};
+
+export const getOrderMessages = async (userId: number, orderId: number) => {
+  // Validate assigned order
+  await getOrder(userId, orderId);
+  return db
+    .select({
+      id: orderMessages.id,
+      orderId: orderMessages.orderId,
+      senderId: orderMessages.senderId,
+      message: orderMessages.message,
+      createdAt: orderMessages.createdAt,
+      senderName: users.name,
+    })
+    .from(orderMessages)
+    .innerJoin(users, eq(orderMessages.senderId, users.id))
+    .where(eq(orderMessages.orderId, orderId))
+    .orderBy(orderMessages.createdAt);
+};
+
+export const sendOrderMessage = async (userId: number, orderId: number, messageText: string) => {
+  await getOrder(userId, orderId);
+  const [msg] = await db
+    .insert(orderMessages)
+    .values({
+      orderId,
+      senderId: userId,
+      message: messageText,
+    })
+    .returning();
+  return msg;
 };

@@ -11,6 +11,7 @@ const uid = (req: Request) => req.user!.id;
 
 /** Admin routes — 17+ endpoints */
 router.get("/dashboard/live", asyncHandler(async (_req, res) => successResponse(res, await svc.liveDashboard())));
+router.get("/dashboard/realtime", asyncHandler(async (_req, res) => successResponse(res, await svc.realtimeDashboard())));
 router.get("/analytics/daily", asyncHandler(async (_req, res) => successResponse(res, await svc.dailyAnalytics())));
 router.get("/analytics/demand-supply", asyncHandler(async (_req, res) => successResponse(res, await svc.demandSupply())));
 router.get("/orders", asyncHandler(async (req, res) => successResponse(res, await svc.listOrders(req.query.status as string))));

@@ -19,6 +19,9 @@ import {
   riderAvailability,
   payments,
   refunds,
+  deliveryTrackingEvents,
+  vendorBranches,
+  customerAddresses,
 } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { recordOrderStatus } from "../lib/helpers";
@@ -39,6 +42,33 @@ export const liveDashboard = async () => {
     riders: riderCount ? (await db.select().from(riders)).length : 0,
     customers: customerCount ? (await db.select().from(customerProfiles)).length : 0,
     onlineRiders: onlineRiders.length,
+  };
+};
+
+/** GET /dashboard/realtime — realtime aggregated feed */
+export const realtimeDashboard = async () => {
+  const allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
+  const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+  const allVendors = await db.select().from(vendors).orderBy(desc(vendors.createdAt));
+  const allRiders = await db.select().from(riders);
+  const allCustomerProfiles = await db.select().from(customerProfiles);
+  const allRiderAvailability = await db.select().from(riderAvailability);
+  const allPayments = await db.select().from(payments).orderBy(desc(payments.createdAt));
+  const allTrackingEvents = await db.select().from(deliveryTrackingEvents).orderBy(desc(deliveryTrackingEvents.eventTime));
+  const allBranches = await db.select().from(vendorBranches);
+  const allAddresses = await db.select().from(customerAddresses);
+
+  return {
+    orders: allOrders,
+    users: allUsers,
+    vendors: allVendors,
+    riders: allRiders,
+    customerProfiles: allCustomerProfiles,
+    riderAvailability: allRiderAvailability,
+    payments: allPayments,
+    trackingEvents: allTrackingEvents,
+    vendorBranches: allBranches,
+    customerAddresses: allAddresses,
   };
 };
 
