@@ -5,11 +5,31 @@ import { pool } from "./config/database";
 import redisClient from "./config/redis";
 import app from "./app";
 import { registerSocketHandlers } from "./socket/handlers";
+import { setIo } from "./socket";
+import { verifyAccessToken } from "./utils/jwt";
 
 /** Create HTTP server and attach Socket.IO for live tracking */
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: env.FRONTEND_URL, credentials: true },
+});
+
+setIo(io);
+// Socket auth middleware: verify token in handshake.auth.token and attach `user` to socket.data
+io.use((socket, next) => {
+  try {
+    const token = (socket.handshake.auth && (socket.handshake.auth as any).token) || null;
+    if (token) {
+      const user = verifyAccessToken(token as string);
+      // attach user to socket data for handlers to use
+      (socket.data as any).user = user;
+    }
+    return next();
+  } catch (err) {
+    console.log("Socket auth middleware error:", err instanceof Error ? err.message : err);
+    // allow unauthenticated sockets to continue (some pages may use public events)
+    return next();
+  }
 });
 
 registerSocketHandlers(io);

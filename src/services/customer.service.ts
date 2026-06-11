@@ -214,6 +214,16 @@ export const placeOrder = async (
   const items = await db.select().from(cartItems).where(eq(cartItems.cartId, cart.id));
   if (!items.length) throw new AppError(400, "Cart is empty", "MISSING_FIELDS");
 
+  // Transactionally abandon any prior CONVERTED cart and mark current as CONVERTED
+  // (must happen FIRST to avoid unique constraint violation when creating order)
+  await db.transaction(async (tx) => {
+    await tx
+      .update(carts)
+      .set({ status: "ABANDONED" })
+      .where(and(eq(carts.customerId, c.id), eq(carts.vendorId, body.vendorId), eq(carts.status, "CONVERTED")));
+    await tx.update(carts).set({ status: "CONVERTED" }).where(eq(carts.id, cart.id));
+  });
+
   let subtotal = 0;
   for (const i of items) subtotal += Number(i.price) * i.quantity;
   const taxAmount = subtotal * 0.05;
@@ -255,7 +265,6 @@ export const placeOrder = async (
   }
 
   await recordOrderStatus(order.id, "PLACED", "Order Placed", userId);
-  await db.update(carts).set({ status: "CONVERTED" }).where(eq(carts.id, cart.id));
   return order;
 };
 

@@ -12,9 +12,13 @@ import {
   vendorSettlements,
   vendorPerformanceMetrics,
   users,
+  orderStatusHistory,
+  orderTrackingTimeline,
 } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { getVendorByUserId, recordOrderStatus } from "../lib/helpers";
+import { assignRiderToOrder } from "./rider.service";
+import { emitRiderAssigned, emitOrderStatus } from "../socket";
 
 /** GET /profile */
 export const getProfile = async (userId: number) => {
@@ -179,7 +183,32 @@ const vendorOrderAction = async (userId: number, orderId: number, status: string
 export const acceptOrder = (userId: number, orderId: number) => vendorOrderAction(userId, orderId, "ACCEPTED", "Order Accepted");
 export const rejectOrder = (userId: number, orderId: number) => vendorOrderAction(userId, orderId, "REJECTED", "Order Rejected");
 export const markPreparing = (userId: number, orderId: number) => vendorOrderAction(userId, orderId, "PREPARING", "Preparing Food");
-export const markReady = (userId: number, orderId: number) => vendorOrderAction(userId, orderId, "READY", "Food Ready");
+export const markReady = async (userId: number, orderId: number) => {
+  // perform status update and rider assignment transactionally
+  let assignmentResult: any = null;
+  await db.transaction(async (tx) => {
+    // update order status/history
+    await tx.update(orders).set({ status: "READY", updatedAt: new Date() }).where(eq(orders.id, orderId));
+    await tx.insert(orderStatusHistory).values({ orderId, status: "READY", changedBy: userId, remarks: "Food Ready" });
+    await tx.insert(orderTrackingTimeline).values({ orderId, title: "Ready", description: "Order is ready for pickup" });
+
+    // assign rider within transaction
+    assignmentResult = await assignRiderToOrder(orderId, tx);
+  });
+
+  // emit events after transaction commit
+  try {
+    if (assignmentResult && assignmentResult.rider) {
+      emitRiderAssigned(orderId, { riderId: assignmentResult.rider.id, riderName: assignmentResult.user?.name, riderPhone: assignmentResult.user?.phone });
+    }
+    emitOrderStatus(orderId, "READY", "Food Ready");
+  } catch (err) {
+    console.error("Failed to emit post-transaction events:", err);
+  }
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+  return order;
+};
 
 /** Analytics */
 export const analyticsSummary = async (userId: number) => {

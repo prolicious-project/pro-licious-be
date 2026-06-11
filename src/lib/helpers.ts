@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq } from "drizzle-orm"; 
 import { db } from "../db";
 import {
   users,
@@ -10,6 +10,7 @@ import {
   orders,
 } from "../db/schema";
 import { AppError } from "./errors";
+import { emitOrderStatus } from "../socket";
 
 /** Fetch user row or 404 */
 export const getUserById = async (id: number) => {
@@ -60,4 +61,10 @@ export const recordOrderStatus = async (
   await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, orderId));
   await db.insert(orderStatusHistory).values({ orderId, status, changedBy, remarks });
   await db.insert(orderTrackingTimeline).values({ orderId, title, description: remarks });
+  try {
+    emitOrderStatus(orderId, status, title);
+  } catch (err) {
+    // Non-fatal: emitting should not break business flow
+    console.error("Failed to emit order status via socket:", err);
+  }
 };

@@ -16,7 +16,7 @@ async function seed() {
       { roleName: "VENDOR", description: "Vendor" },
       { roleName: "RIDER", description: "Delivery Rider" },
     ]).onConflictDoNothing();
-
+         
     const passwordHash = await bcrypt.hash("password123", 10);
 
     // 2. Users

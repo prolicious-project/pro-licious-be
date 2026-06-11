@@ -18,6 +18,7 @@ import {
 import { AppError } from "../lib/errors";
 import { getRiderByUserId, recordOrderStatus } from "../lib/helpers";
 import { generateOTP, hashOTP, verifyOTP } from "../utils/otp";
+import { users } from "../db/schema";
 
 /** PATCH /availability — online/offline toggle */
 export const setAvailability = async (userId: number, isOnline: boolean) => {
@@ -153,4 +154,34 @@ export const createDeliveryOtp = async (phone: string) => {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
   return otp;
+};
+
+/** Assign a rider to an order (simple nearest-available strategy) */
+export const assignRiderToOrder = async (orderId: number, tx?: any) => {
+  // find an online rider (most recently seen)
+  const runner = tx || db;
+  const rows = await runner
+    .select()
+    .from(riderAvailability)
+    .where(eq(riderAvailability.isOnline, true))
+    .orderBy(desc(riderAvailability.lastSeen));
+  if (!rows.length) return null;
+  const riderAvail = rows[0];
+  const [riderRow] = await runner.select().from(riders).where(eq(riders.id, riderAvail.riderId));
+  if (!riderRow) return null;
+
+  const [userRow] = await runner.select().from(users).where(eq(users.id, riderRow.userId));
+
+  const [assignment] = await runner
+    .insert(riderAssignments)
+    .values({ orderId, riderId: riderRow.id, status: "ASSIGNED", assignedAt: new Date() })
+    .returning();
+
+  // create notification record (in same tx if provided)
+  if (userRow) {
+    await runner.insert(notifications).values({ userId: userRow.id, title: "New delivery", message: `You have a new delivery (order ${orderId})`, type: "DELIVERY" });
+  }
+
+  // return assignment and rider info; caller should emit socket events after commit
+  return { assignment, rider: riderRow, user: userRow };
 };
