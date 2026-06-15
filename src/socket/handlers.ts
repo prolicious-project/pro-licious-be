@@ -36,9 +36,19 @@ export const registerSocketHandlers = (io: Server) => {
     /** Rider pushes GPS location during delivery */
     socket.on(
       "rider_location_update",
-      async ({ orderId, riderId, latitude, longitude }: { orderId: number; riderId: number; latitude: number; longitude: number }) => {
+      async (payload: { orderId: number; riderId?: number; latitude: number; longitude: number }) => {
         try {
-          if (!orderId || !Number.isFinite(orderId) || !riderId || !Number.isFinite(riderId)) return;
+          const { orderId, latitude, longitude } = payload;
+          if (!orderId || !Number.isFinite(orderId)) return;
+          let riderId = payload.riderId;
+          if (!riderId) {
+            const user = (socket.data as any)?.user;
+            if (user && user.role === "RIDER") {
+              const rider = await getRiderByUserId(user.id);
+              riderId = rider.id;
+            }
+          }
+          if (!riderId || !Number.isFinite(riderId)) return;
           await db.insert(deliveryTrackingEvents).values({
             orderId,
             riderId,
@@ -54,8 +64,16 @@ export const registerSocketHandlers = (io: Server) => {
     );
 
     /** Rider goes online */
-    socket.on("rider_go_online", async ({ riderId }: { riderId: number }) => {
+    socket.on("rider_go_online", async (payload: { riderId?: number }) => {
       try {
+        let riderId = payload?.riderId;
+        if (!riderId) {
+          const user = (socket.data as any)?.user;
+          if (user && user.role === "RIDER") {
+            const rider = await getRiderByUserId(user.id);
+            riderId = rider.id;
+          }
+        }
         if (!riderId || !Number.isFinite(riderId)) return;
         await db.update(riderAvailability).set({ isOnline: true, lastSeen: new Date() }).where(eq(riderAvailability.riderId, riderId));
         io.emit("rider_online", { riderId, isOnline: true });
@@ -68,8 +86,16 @@ export const registerSocketHandlers = (io: Server) => {
     });
 
     /** Rider goes offline */
-    socket.on("rider_go_offline", async ({ riderId }: { riderId: number }) => {
+    socket.on("rider_go_offline", async (payload: { riderId?: number }) => {
       try {
+        let riderId = payload?.riderId;
+        if (!riderId) {
+          const user = (socket.data as any)?.user;
+          if (user && user.role === "RIDER") {
+            const rider = await getRiderByUserId(user.id);
+            riderId = rider.id;
+          }
+        }
         if (!riderId || !Number.isFinite(riderId)) return;
         await db.update(riderAvailability).set({ isOnline: false, lastSeen: new Date() }).where(eq(riderAvailability.riderId, riderId));
         io.emit("rider_offline", { riderId, isOnline: false });
