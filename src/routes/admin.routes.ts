@@ -6,7 +6,7 @@ import { successResponse } from "../utils/responses";
 import * as svc from "../services/admin.service";
 
 const router = Router();
-router.use(authMiddleware, roleGuard("ADMIN"));
+router.use(authMiddleware, roleGuard("ADMIN", "SUPER_ADMIN"));
 const uid = (req: Request) => req.user!.id;
 
 /** Admin routes — 17+ endpoints */
