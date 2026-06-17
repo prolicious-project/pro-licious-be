@@ -217,7 +217,25 @@ export const verifyVendorDocument = async (adminId: number, vendorId: number, do
 };
 
 /** GET /riders */
-export const listRiders = async () => db.select().from(riders);
+export const listRiders = async () =>
+  db
+    .select({
+      id: riders.id,
+      userId: riders.userId,
+      name: users.name,
+      phone: users.phone,
+      email: users.email,
+      vehicleType: riders.vehicleType,
+      vehicleNumber: riders.vehicleNumber,
+      licenseNumber: riders.licenseNumber,
+      rcNumber: riders.rcNumber,
+      panNumber: riders.panNumber,
+      address: riders.address,
+      status: riders.status,
+    })
+    .from(riders)
+    .leftJoin(users, eq(users.id, riders.userId))
+    .orderBy(desc(riders.id));
 
 /** POST /riders */
 export const createRider = async (
@@ -230,6 +248,9 @@ export const createRider = async (
     vehicleType?: string;
     vehicleNumber?: string;
     licenseNumber?: string;
+    rcNumber?: string;
+    panNumber?: string;
+    address?: string;
     documents?: { documentType: string; fileUrl: string }[];
   }
 ) => {
@@ -251,6 +272,9 @@ export const createRider = async (
       vehicleType: body.vehicleType,
       vehicleNumber: body.vehicleNumber,
       licenseNumber: body.licenseNumber,
+      rcNumber: body.rcNumber,
+      panNumber: body.panNumber,
+      address: body.address,
       status: "ACTIVE",
     })
     .returning();

@@ -282,6 +282,9 @@ export const riders = pgTable("riders", {
   vehicleType: varchar("vehicle_type", { length: 30 }),
   vehicleNumber: varchar("vehicle_number", { length: 20 }),
   licenseNumber: varchar("license_number", { length: 20 }),
+  rcNumber: varchar("rc_number", { length: 30 }),
+  panNumber: varchar("pan_number", { length: 20 }),
+  address: text(),
   status: varchar({ length: 20 }).notNull().default("PENDING"),
 });
 
