@@ -1,4 +1,4 @@
-import { eq, and, desc, gte } from "drizzle-orm";
+import { eq, and, desc, gte, or } from "drizzle-orm";
 import { db } from "../db";
 import {
   orders,
@@ -90,21 +90,106 @@ export const createRefund = async (adminId: number, body: { paymentId: number; a
 export const listVendors = async () => db.select().from(vendors).orderBy(desc(vendors.createdAt));
 
 /** POST /vendors — onboard vendor with user account */
-export const createVendor = async (adminId: number, body: { name: string; phone: string; email?: string; password?: string }) => {
-  const [user] = await db
-    .insert(users)
+export const createVendor = async (
+  adminId: number,
+  body: {
+    name: string;
+    ownerName?: string;
+    businessAddress?: string;
+    phone: string;
+    email?: string;
+    password?: string;
+    gstNumber?: string;
+    panNumber?: string;
+    fssaiLicense?: string;
+    documents?: { documentType: string; fileUrl: string }[];
+  }
+) => {
+  const existingUser = await db
+    .select({ id: users.id, email: users.email, phone: users.phone })
+    .from(users)
+    .where(
+      body.email && body.phone
+        ? or(eq(users.email, body.email), eq(users.phone, body.phone))
+        : body.email
+          ? eq(users.email, body.email)
+          : eq(users.phone, body.phone)
+    );
+
+  if (existingUser.length > 0) {
+    throw new AppError(409, "A vendor account with this email or phone already exists.", "VENDOR_CONTACT_EXISTS");
+  }
+
+  try {
+    const [user] = await db
+      .insert(users)
+      .values({
+        name: body.name,
+        phone: body.phone,
+        email: body.email,
+        role: "VENDOR",
+        passwordHash: body.password ? await hashPassword(body.password) : undefined,
+        status: "ACTIVE",
+      })
+      .returning();
+  const [vendor] = await db
+    .insert(vendors)
     .values({
+      userId: user.id,
       name: body.name,
+      ownerName: body.ownerName,
+      description: body.businessAddress,
+      businessAddress: body.businessAddress,
       phone: body.phone,
       email: body.email,
-      role: "VENDOR",
-      passwordHash: body.password ? await hashPassword(body.password) : undefined,
+      gstNumber: body.gstNumber,
+      panNumber: body.panNumber,
+      fssaiLicense: body.fssaiLicense,
       status: "ACTIVE",
     })
     .returning();
-  const [vendor] = await db.insert(vendors).values({ userId: user.id, name: body.name, phone: body.phone, email: body.email, status: "ACTIVE" }).returning();
-  await logAdminAction(adminId, "VENDOR_CREATED", "vendor", vendor.id);
-  return vendor;
+
+    if (body.documents && body.documents.length > 0) {
+      await db.insert(vendorDocuments).values(
+        body.documents.map((doc) => ({
+          vendorId: vendor.id,
+          documentType: doc.documentType,
+          fileUrl: doc.fileUrl,
+          verificationStatus: "PENDING",
+        }))
+      );
+    }
+
+    await logAdminAction(adminId, "VENDOR_CREATED", "vendor", vendor.id);
+    return vendor;
+  } catch (error: any) {
+    if (error?.code === "23505") {
+      throw new AppError(409, "A vendor account with this email or phone already exists.", "VENDOR_CONTACT_EXISTS");
+    }
+    throw error;
+  }
+};
+
+/** DELETE /vendors/:id */
+export const deleteVendor = async (adminId: number, vendorId: number) => {
+  const [vendor] = await db.select().from(vendors).where(eq(vendors.id, vendorId));
+  if (!vendor) throw new AppError(404, "Vendor not found", "VENDOR_NOT_FOUND");
+
+  const existingOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.vendorId, vendorId)).limit(1);
+
+  if (existingOrders.length > 0) {
+    await db.update(vendors).set({ status: "INACTIVE" }).where(eq(vendors.id, vendorId));
+    await db.update(users).set({ status: "INACTIVE" }).where(eq(users.id, vendor.userId));
+    await logAdminAction(adminId, "VENDOR_DEACTIVATED", "vendor", vendorId, "Linked orders exist");
+
+    return { id: vendorId, message: "Vendor deactivated because linked orders still exist" };
+  }
+
+  await db.delete(vendors).where(eq(vendors.id, vendorId));
+  await db.delete(users).where(eq(users.id, vendor.userId));
+  await logAdminAction(adminId, "VENDOR_DELETED", "vendor", vendorId);
+
+  return { id: vendorId, message: "Vendor deleted" };
 };
 
 /** PATCH /vendors/:id/status */
@@ -135,9 +220,52 @@ export const verifyVendorDocument = async (adminId: number, vendorId: number, do
 export const listRiders = async () => db.select().from(riders);
 
 /** POST /riders */
-export const createRider = async (adminId: number, body: { name: string; phone: string; email?: string }) => {
-  const [user] = await db.insert(users).values({ name: body.name, phone: body.phone, email: body.email, role: "RIDER", status: "ACTIVE" }).returning();
-  const [rider] = await db.insert(riders).values({ userId: user.id, status: "ACTIVE" }).returning();
+export const createRider = async (
+  adminId: number,
+  body: {
+    name: string;
+    phone: string;
+    email?: string;
+    password?: string;
+    vehicleType?: string;
+    vehicleNumber?: string;
+    licenseNumber?: string;
+    documents?: { documentType: string; fileUrl: string }[];
+  }
+) => {
+  const [user] = await db
+    .insert(users)
+    .values({
+      name: body.name,
+      phone: body.phone,
+      email: body.email,
+      role: "RIDER",
+      passwordHash: body.password ? await hashPassword(body.password) : undefined,
+      status: "ACTIVE",
+    })
+    .returning();
+  const [rider] = await db
+    .insert(riders)
+    .values({
+      userId: user.id,
+      vehicleType: body.vehicleType,
+      vehicleNumber: body.vehicleNumber,
+      licenseNumber: body.licenseNumber,
+      status: "ACTIVE",
+    })
+    .returning();
+
+  if (body.documents && body.documents.length > 0) {
+    await db.insert(riderDocuments).values(
+      body.documents.map((doc) => ({
+        riderId: rider.id,
+        documentType: doc.documentType,
+        fileUrl: doc.fileUrl,
+        verificationStatus: "PENDING",
+      }))
+    );
+  }
+
   await logAdminAction(adminId, "RIDER_CREATED", "rider", rider.id);
   return rider;
 };

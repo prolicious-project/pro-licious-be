@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import path from "path";
+import fs from "fs";
 import { swaggerUi, swaggerSpec, swaggerUiOptions } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth.routes";
@@ -18,8 +20,37 @@ app.use(helmet());
 app.use(cors({ origin: ["http://localhost:3000", "http://127.0.0.1:3000"], credentials: true }));
 app.use(morgan("dev"));
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Serve static uploaded files
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Handle base64 uploads
+app.post("/api/upload", (req, res) => {
+  try {
+    const { file, fileName } = req.body;
+    if (!file || !fileName) {
+      res.status(400).json({ success: false, message: "Missing file or fileName" });
+      return;
+    }
+    const base64Data = file.replace(/^data:image\/\w+;base64,/, "").replace(/^data:application\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    const uploadsDir = path.join(__dirname, "../uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const uniqueFileName = `${Date.now()}-${fileName.replace(/\s+/g, "_")}`;
+    const filePath = path.join(uploadsDir, uniqueFileName);
+    fs.writeFileSync(filePath, buffer);
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${uniqueFileName}`;
+    res.json({ success: true, url: fileUrl });
+  } catch (error: any) {
+    console.error("Upload error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 
 /** Disable caching for API routes to prevent 304 responses during development */
 app.use("/api", (req, res, next) => {

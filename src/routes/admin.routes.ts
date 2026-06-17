@@ -19,6 +19,10 @@ router.patch("/orders/:id/cancel", asyncHandler(async (req, res) => successRespo
 router.post("/refunds", asyncHandler(async (req, res) => successResponse(res, await svc.createRefund(uid(req), req.body), "Refund created", 201)));
 router.get("/vendors", asyncHandler(async (_req, res) => successResponse(res, await svc.listVendors())));
 router.post("/vendors", asyncHandler(async (req, res) => successResponse(res, await svc.createVendor(uid(req), req.body), "Vendor created", 201)));
+router.delete("/vendors/:id", asyncHandler(async (req, res) => {
+  const result = await svc.deleteVendor(uid(req), +req.params.id);
+  return successResponse(res, result, result.message);
+}));
 router.patch("/vendors/:id/status", asyncHandler(async (req, res) => successResponse(res, await svc.updateVendorStatus(uid(req), +req.params.id, req.body.status))));
 router.get("/vendors/:id/documents", asyncHandler(async (req, res) => successResponse(res, await svc.listVendorDocuments(+req.params.id))));
 router.patch("/vendors/:id/documents/:docId", asyncHandler(async (req, res) => successResponse(res, await svc.verifyVendorDocument(uid(req), +req.params.id, +req.params.docId, req.body.status))));

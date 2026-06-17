@@ -33,5 +33,7 @@ router.get("/shifts", asyncHandler(async (req, res) => successResponse(res, awai
 router.get("/settlements", asyncHandler(async (req, res) => successResponse(res, await svc.listSettlements(uid(req)))));
 router.get("/payouts", asyncHandler(async (req, res) => successResponse(res, await svc.listPayouts(uid(req)))));
 router.get("/notifications", asyncHandler(async (req, res) => successResponse(res, await svc.listNotifications(uid(req)))));
+router.get("/documents", asyncHandler(async (req, res) => successResponse(res, await svc.listDocuments(uid(req)))));
+router.post("/documents", asyncHandler(async (req, res) => successResponse(res, await svc.uploadDocument(uid(req), req.body.documentType, req.body.fileUrl))));
 
 export default router;

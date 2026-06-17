@@ -21,7 +21,7 @@ import {
 import { AppError } from "../lib/errors";
 import { getRiderByUserId, recordOrderStatus } from "../lib/helpers";
 import { generateOTP, hashOTP, verifyOTP, storeOtpRedis, getOtpRedis, clearOtpRedis } from "../utils/otp";
-import { users } from "../db/schema";
+import { users, riderDocuments } from "../db/schema";
 import { getIo } from "../socket";
 
 /** PATCH /availability — online/offline toggle */
@@ -378,4 +378,37 @@ export const assignRiderToOrder = async (orderId: number, tx?: any) => {
 
   // return assignment and rider info; caller should emit socket events after commit
   return { assignment, rider: riderRow, user: userRow };
+};
+
+export const listDocuments = async (userId: number) => {
+  const rider = await getRiderByUserId(userId);
+  return db.select().from(riderDocuments).where(eq(riderDocuments.riderId, rider.id));
+};
+
+export const uploadDocument = async (userId: number, documentType: string, fileUrl: string) => {
+  const rider = await getRiderByUserId(userId);
+  const existing = await db
+    .select()
+    .from(riderDocuments)
+    .where(and(eq(riderDocuments.riderId, rider.id), eq(riderDocuments.documentType, documentType)));
+
+  if (existing.length > 0) {
+    const [updated] = await db
+      .update(riderDocuments)
+      .set({ fileUrl, verificationStatus: "PENDING" })
+      .where(eq(riderDocuments.id, existing[0].id))
+      .returning();
+    return updated;
+  } else {
+    const [inserted] = await db
+      .insert(riderDocuments)
+      .values({
+        riderId: rider.id,
+        documentType,
+        fileUrl,
+        verificationStatus: "PENDING",
+      })
+      .returning();
+    return inserted;
+  }
 };
