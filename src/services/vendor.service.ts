@@ -160,8 +160,14 @@ export const toggleMenuAvailability = async (userId: number, id: number, status:
 /** Orders */
 export const listOrders = async (userId: number, status?: string) => {
   const vendor = await getVendorByUserId(userId);
-  const cond = status
-    ? and(eq(orders.vendorId, vendor.id), eq(orders.status, status))
+  let statusCond;
+  if (status === "PLACED") {
+    statusCond = inArray(orders.status, ["PLACED", "PAID"]);
+  } else if (status) {
+    statusCond = eq(orders.status, status);
+  }
+  const cond = statusCond
+    ? and(eq(orders.vendorId, vendor.id), statusCond)
     : eq(orders.vendorId, vendor.id);
   return db.select().from(orders).where(cond).orderBy(desc(orders.createdAt));
 };

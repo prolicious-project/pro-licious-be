@@ -315,10 +315,29 @@ export const cancelOrder = async (userId: number, orderId: number) => {
 export const initiatePayment = async (userId: number, orderId: number) => {
   const order = await getOrder(userId, orderId);
   const rzOrder = await createRazorpayOrder(Number(order.totalAmount), order.orderNumber);
-  const [payment] = await db
-    .insert(payments)
-    .values({ orderId, amount: order.totalAmount, paymentReference: rzOrder.id, status: "PENDING" })
-    .returning();
+
+  // Check if a PENDING payment exists; update it, otherwise insert new
+  const existing = await db
+    .select()
+    .from(payments)
+    .where(and(eq(payments.orderId, orderId), eq(payments.status, "PENDING")));
+
+  let payment;
+  if (existing.length > 0) {
+    const [updated] = await db
+      .update(payments)
+      .set({ paymentReference: rzOrder.id })
+      .where(eq(payments.id, existing[0].id))
+      .returning();
+    payment = updated;
+  } else {
+    const [inserted] = await db
+      .insert(payments)
+      .values({ orderId, amount: order.totalAmount, paymentReference: rzOrder.id, status: "PENDING" })
+      .returning();
+    payment = inserted;
+  }
+
   return { paymentId: payment.id, razorpayOrderId: rzOrder.id, amount: order.totalAmount, key: env.RAZORPAY_KEY_ID };
 };
 
