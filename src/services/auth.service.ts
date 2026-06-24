@@ -95,6 +95,57 @@ export const verifyOtpSignup = async (
   return issueTokens(user.id, user.role);
 };
 
+/** POST /api/auth/register — direct register with name, email, phone, and password */
+export const registerCustomer = async (
+  name: string,
+  email: string,
+  phone: string,
+  password?: string,
+  role: string = "CUSTOMER"
+) => {
+  if (!ALLOWED_ROLES.includes(role as (typeof ALLOWED_ROLES)[number])) {
+    throw new AppError(400, "Invalid role", "INVALID_ROLE");
+  }
+
+  // Check if user already exists with this phone number
+  const [existingByPhone] = await db.select().from(users).where(eq(users.phone, phone));
+  if (existingByPhone) {
+    throw new AppError(400, "User with this phone number already exists", "USER_EXISTS");
+  }
+
+  // Check if user already exists with this email
+  if (email) {
+    const [existingByEmail] = await db.select().from(users).where(eq(users.email, email));
+    if (existingByEmail) {
+      throw new AppError(400, "User with this email already exists", "USER_EXISTS");
+    }
+  }
+
+  const hash = password ? await hashPassword(password) : null;
+
+  const [user] = await db
+    .insert(users)
+    .values({
+      name,
+      phone,
+      email: email || null,
+      passwordHash: hash,
+      role,
+      status: "ACTIVE",
+    })
+    .returning();
+
+  if (role === "CUSTOMER") {
+    await db.insert(customerProfiles).values({ userId: user.id });
+  } else if (role === "VENDOR") {
+    await db.insert(vendors).values({ userId: user.id, name, phone, status: "PENDING" });
+  } else if (role === "RIDER") {
+    await db.insert(riders).values({ userId: user.id, status: "PENDING" });
+  }
+
+  return issueTokens(user.id, user.role);
+};
+
 /** POST /api/auth/login — email + password */
 export const login = async (email: string, password: string) => {
   const [user] = await db.select().from(users).where(eq(users.email, email));

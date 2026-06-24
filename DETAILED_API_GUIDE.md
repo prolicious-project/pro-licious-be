@@ -132,13 +132,12 @@ Used across all platforms (Flutter app, Web portals) to log users in and secure 
 *   **Auth Required**: No (Public)
 *   **Request Body**:
     ```json
-    {
+    {   
       "phone": "9876543210",
       "otp": "123456",
       "name": "Alex Mercer",     // Required for new signups
       "role": "CUSTOMER"         // Options: CUSTOMER, VENDOR, RIDER (Required for new signups)
-    }
-    ```
+    } ```
 *   **Expected Response (200 OK)**:
     ```json
     {

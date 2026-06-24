@@ -25,6 +25,21 @@ export const verifyOtp = async (req: Request, res: Response) => {
   successResponse(res, data, "Authenticated");
 };
 
+/** POST /register */
+export const register = async (req: Request, res: Response) => {
+  const { name, email, phone, password, role } = req.body;
+  const data = await authService.registerCustomer(name, email, phone, password, role);
+  if (data.refreshToken) {
+    res.cookie("refreshToken", data.refreshToken, {
+      httpOnly: true,
+      secure: env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+  }
+  successResponse(res, data, "User registered successfully", 201);
+};
+
 /** POST /login */
 export const login = async (req: Request, res: Response) => {
   const data = await authService.login(req.body.email, req.body.password);
