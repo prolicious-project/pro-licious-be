@@ -870,3 +870,21 @@ Requires `role` to be `"SUPER_ADMIN"`.
       "response": "Refund has been processed and credited to your card."
     }
     ```
+
+
+
+env for prod :
+
+DATABASE_URL=postgresql://neondb_owner:npg_5gFvWxDyGl8d@ep-tiny-cherry-ato49y9r.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require
+NODE_ENV=development
+RAZORPAY_KEY_ID=rzp_test_SRrKIfsKje5uNq
+RAZORPAY_KEY_SECRET=KfntU4VVvNMAX64AvdhClFNd
+RAZORPAY_WEBHOOK_SECRET=BALAJI
+JWT_SECRET=22acf41ebb7d622101279e4e543489c60b05e591878a87398ab225b20d343e8a62c222abe976f737613e4c297e9b6a0b58969223b8f863b5d154d086011f3139
+JWT_REFRESH_SECRET=your-refresh-secret-min-32-chars-change-this
+REDIS_URL=redis://default:AUjZWqjdnaBIzMWFcldhgSVMOhsoWiu7@copper-weatherproof-zippy-23102.db.redis.io:15830
+PORT=5000
+FRONTEND_URL=http://localhost:3000  
+
+
+
