@@ -5,34 +5,12 @@ import { eq, or, and } from "drizzle-orm";
 import { verifyOTP, getOtpRedis } from "../utils/otp";
 import { verifyAccessToken } from "../utils/jwt";
 import { getRiderByUserId } from "../lib/helpers";
-import * as svc from "../services/rider.service";
-import { assignRiderToOrder } from "../services/rider.service";
+// import { assignRiderToOrder, getAssignmentsForRider } from "../services/rider.service";
+
+import * as RiderService from "../services/rider.service";
+import { getAssignmentsForRider } from "../services/rider.service";
 
 /** Register all Socket.IO event handlers for live order tracking */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -48,7 +26,7 @@ export const registerSocketHandlers = (io: Server) => {
         const rider = await getRiderByUserId(user.id);
         socket.join(`rider:${rider.id}`);
         // send pending/assigned assignments to rider (enriched with order details)
-        const pending = await svc.getAssignmentsForRider(rider.id);
+        const pending = await RiderService.getAssignmentsForRider(rider.id);
         socket.emit("pending_assignments", { assignments: pending });
       }
     } catch (err) {
@@ -81,7 +59,7 @@ export const registerSocketHandlers = (io: Server) => {
       await db.update(riderAvailability).set({ isOnline: true, lastSeen: new Date() }).where(eq(riderAvailability.riderId, riderId));
       io.emit("rider_online", { riderId, isOnline: true });
       // emit any pending assignments to this rider room (enriched)
-      const pending = await svc.getAssignmentsForRider(riderId);
+      const pending = await RiderService.getAssignmentsForRider(riderId);
       io.to(`rider:${riderId}`).emit("pending_assignments", { assignments: pending });
     });
 
@@ -94,10 +72,10 @@ export const registerSocketHandlers = (io: Server) => {
     /** Assign rider to order via socket */
     socket.on("assign_rider_to_order", async ({ orderId, vendorId }) => {
       try {
-        const result = await assignRiderToOrder(orderId);
+        const result = await RiderService.assignRiderToOrder(orderId);
         if (result) {
           // enrich the created assignment with full order details
-          const riderAssignments = await svc.getAssignmentsForRider(result.rider.id);
+          const riderAssignments = await RiderService.getAssignmentsForRider(result.rider.id);
           const enriched = riderAssignments.find((x: any) => x.assignment && x.assignment.orderId === orderId);
           io.to(`rider:${result.rider.id}`).emit("new_order_assigned", { orderId, assignment: enriched });
           io.to(`order:${orderId}`).emit("rider_assigned", { orderId, riderId: result.rider.id, riderName: result.user.name, riderPhone: result.user.phone });
