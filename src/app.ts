@@ -18,7 +18,10 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL?.split(","),
+   origin: [
+      ...(process.env.FRONTEND_URL?.split(",") || []),
+      "http://localhost:8081",
+    ],
   credentials: true,
 }));
 app.use(morgan("dev"));
